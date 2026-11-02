@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "name": "Essenciais",
+  "description": "Um começo organizado: navegador, compactador, editor e reprodutor de mídia.",
+  "packages": [
+    { "provider": "winget", "id": "Mozilla.Firefox" },
+    { "provider": "winget", "id": "7zip.7zip" },
+    { "provider": "winget", "id": "Microsoft.VisualStudioCode" },
+    { "provider": "winget", "id": "VideoLAN.VLC" }
+  ]
+}

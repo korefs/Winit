@@ -1,0 +1,44 @@
+name: Windows x64
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --locked
+      - name: Build portable Windows x64
+        run: cargo build --locked --release --target x86_64-pc-windows-msvc
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force
+          New-Item -ItemType Directory -Path dist/assets -Force
+          New-Item -ItemType Directory -Path dist/docs -Force
+          Copy-Item target/x86_64-pc-windows-msvc/release/winit.exe dist/Winit.exe
+          Copy-Item README.md dist/README.md
+          Copy-Item assets/essentials.json dist/essentials.json
+          Copy-Item assets/duodesk-catalog.json dist/duodesk-catalog.json
+          Copy-Item assets/duodesk-catalog.json dist/assets/duodesk-catalog.json
+          Copy-Item docs/CUSTOM_APPS.md dist/docs/CUSTOM_APPS.md
+          Copy-Item docs/CUSTOM_APPS_VALIDATION.md dist/docs/CUSTOM_APPS_VALIDATION.md
+          Copy-Item assets/icon.png dist/assets/icon.png
+          Get-FileHash dist/Winit.exe -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  Winit.exe" } | Set-Content dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Winit-Windows-x64
+          path: dist/
+          if-no-files-found: error

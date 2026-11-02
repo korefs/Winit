@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "apps": [
+    {
+      "id": "268e963e-0473-4a75-9f13-d00de5c00001",
+      "name": "DuoDesk",
+      "description": "Compartilhe teclado, mouse e recursos entre dispositivos.",
+      "category": "Produtividade",
+      "website": "https://getduodesk.vercel.app/",
+      "instructions": "Revise a origem e execute o instalador somente após confirmação. Feche o DuoDesk antes de atualizar. Baixar ou marcar como concluído não comprova instalação.",
+      "source": {
+        "kind": "github",
+        "repository": "0xCodez/DuoDesk",
+        "prerelease": false,
+        "architecture": "x64",
+        "asset_pattern": "DuoDesk-Setup-*.exe"
+      }
+    }
+  ]
+}

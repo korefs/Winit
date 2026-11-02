@@ -1,0 +1,7 @@
+/target/
+/dist/
+/winit-data/
+/aio-data/
+*.partial
+*.tmp
+/docs

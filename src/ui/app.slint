@@ -1,0 +1,575 @@
+import { ScrollView, LineEdit, TextEdit, CheckBox, ComboBox, Spinner, ProgressIndicator, Palette as WidgetPalette } from "std-widgets.slint";
+export { WidgetPalette }
+
+export struct Entry {
+    key: string, title: string, subtitle: string, version: string, badge: string,
+    selected: bool, favorite: bool, can-select: bool,
+    primary: string, secondary: string, extra: string,
+    progress: float, has-progress: bool, state: int,
+}
+export struct CustomForm {
+    id:string,name:string,description:string,category:string,website:string,instructions:string,
+    source:int,repository:string,prerelease:bool,architecture:int,pattern:string,url:string,filename:string,sha256:string,
+}
+export struct PendingForm {id:string,name:string,website:string,instructions:string,profile:string}
+
+export global Palette {
+    in-out property <bool> dark: true;
+    out property <color> bg: dark ? #111419 : #f4f6f9;
+    out property <color> sidebar: dark ? #15191f : #ffffff;
+    out property <color> panel: dark ? #1b2028 : #ffffff;
+    out property <color> raised: dark ? #232a34 : #edf1f6;
+    out property <color> border: dark ? #303845 : #dce2ea;
+    out property <color> text: dark ? #edf2f8 : #172332;
+    out property <color> muted: dark ? #9caabc : #5f7085;
+    out property <color> accent: dark ? #8ae3cb : #176e5b;
+    out property <color> accent-bg: dark ? #243d39 : #e2f3ed;
+    out property <color> danger: dark ? #ffacac : #ad283b;
+}
+
+component AButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> primary: false;
+    in property <bool> danger: false;
+    in property <bool> enabled: true;
+    callback clicked();
+    height: 36px;
+    horizontal-stretch: 0;
+    width: max(36px, label.preferred-width + 28px);
+    border-radius: 7px;
+    background: !enabled ? Palette.raised : primary ? (touch.has-hover ? #aff3df : #8ae3cb) : (touch.has-hover ? Palette.raised : Palette.panel);
+    border-width: primary ? 0px : 1px;
+    border-color: Palette.border;
+    opacity: enabled ? 1 : 0.45;
+    label := Text {
+        text: root.text == "☆" ? "\u{e734}" : root.text == "★" ? "\u{e735}" : root.text;
+        font-family: root.text == "☆" || root.text == "★" ? "Segoe MDL2 Assets" : "Segoe UI";
+        color: !root.enabled ? Palette.muted : root.primary ? #122e27 : root.danger ? Palette.danger : Palette.text;
+        font-size: 12px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center;
+    }
+    touch := TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { root.clicked(); } }
+    accessible-role: button; accessible-label: text;
+}
+
+component NavItem inherits Rectangle {
+    in property <string> text;
+    in property <string> icon;
+    in property <bool> selected;
+    callback clicked();
+    height: 44px; border-radius: 8px;
+    background: selected ? Palette.accent-bg : area.has-hover ? Palette.raised : transparent;
+    if selected: Rectangle { x: 0; y: 12px; width: 3px; height: 20px; border-radius: 2px; background: Palette.accent; }
+    HorizontalLayout {
+        padding-left: 17px; padding-right: 12px; spacing: 13px;
+        Text { text: root.icon; font-family: "Segoe MDL2 Assets"; font-size: 17px; color: root.selected ? Palette.accent : Palette.muted; width: 20px; vertical-alignment: center; }
+        Text { text: root.text; font-size: 13px; font-weight: root.selected ? 600 : 400; color: root.selected ? Palette.text : Palette.muted; vertical-alignment: center; }
+    }
+    area := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+    accessible-role: button; accessible-label: text;
+}
+
+component StatCard inherits Rectangle {
+    in property <string> label; in property <string> value; in property <string> note;
+    background: Palette.panel; border-color: Palette.border; border-width: 1px; border-radius: 12px;
+    min-height: 118px;
+    VerticalLayout { padding: 18px; spacing: 7px;
+        Text { text: root.label; color: Palette.muted; font-size: 12px; }
+        Text { text: root.value; color: Palette.text; font-size: 28px; font-weight: 650; }
+        Text { text: root.note; color: Palette.muted; font-size: 11px; overflow: elide; }
+    }
+}
+
+component ItemCard inherits Rectangle {
+    in property <Entry> item;
+    callback action(int);
+    callback toggle();
+    min-height: item.has-progress ? 111px : 88px;
+    border-radius: 10px; border-width: 1px;
+    border-color: item.selected ? Palette.accent : Palette.border;
+    background: item.selected ? Palette.accent-bg : Palette.panel;
+    VerticalLayout { padding: 15px; spacing: 10px;
+        HorizontalLayout { spacing: 12px;
+            if root.item.can-select: Rectangle {
+                width: 21px; height: 21px; vertical-stretch: 0; border-radius: 5px; border-width: 1px;
+                border-color: root.item.selected ? Palette.accent : Palette.muted;
+                background: root.item.selected ? Palette.accent : transparent;
+                Text { text: root.item.selected ? "✓" : ""; color: #15392e; horizontal-alignment: center; vertical-alignment: center; font-size: 14px; }
+                TouchArea { mouse-cursor: pointer; clicked => { root.toggle(); } }
+                accessible-role: checkbox; accessible-label: root.item.title;
+            }
+            Rectangle { width: 39px; height: 39px; border-radius: 10px; background: Palette.raised;
+                Text { text: root.item.state == 3 ? "!" : root.item.state == 2 ? "✓" : "\u{2193}"; color: root.item.state == 3 ? Palette.danger : Palette.accent; font-size: 20px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+            }
+            VerticalLayout { spacing: 5px;
+                HorizontalLayout { spacing: 8px;
+                    Text { text: root.item.title; color: Palette.text; font-size: 14px; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
+                    Text { text: root.item.badge; color: root.item.state == 3 ? Palette.danger : Palette.accent; font-size: 10px; vertical-alignment: center; }
+                }
+                Text { text: root.item.subtitle; color: Palette.muted; font-size: 11px; overflow: elide; }
+                if root.item.version != "": Text { text: root.item.version; color: Palette.muted; font-size: 11px; overflow: elide; }
+            }
+            if root.item.extra != "": AButton { text: root.item.extra; clicked => { root.action(2); } }
+            if root.item.secondary != "": AButton { text: root.item.secondary; clicked => { root.action(1); } }
+            if root.item.primary != "": AButton { text: root.item.primary; primary: true; clicked => { root.action(0); } }
+        }
+        if root.item.has-progress: ProgressIndicator { progress: root.item.progress; }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "Winit";
+    icon: @image-url("../../assets/icon.png");
+    preferred-width: 1220px; preferred-height: 820px; min-width: 960px; min-height: 680px;
+    background: Palette.bg;
+    default-font-family: "Segoe UI"; default-font-size: 13px;
+    in-out property <int> page: 0;
+    in-out property <bool> dark: true;
+    in property <[Entry]> entries;
+    in property <[string]> profile-names;
+    in property <[string]> repositories;
+    in property <string> system-info;
+    in property <string> installed-count: "—";
+    in property <string> updates-count: "—";
+    in property <string> profiles-count: "0";
+    in property <string> winget-status: "Verificando…";
+    in property <bool> winget-available: false;
+    in property <string> status: "Pronto para começar";
+    in property <bool> error: false;
+    in property <bool> busy: false;
+    in property <string> empty-title: "Tudo pronto por aqui";
+    in property <string> empty-description;
+    in property <string> selection-label;
+    in property <string> result-label;
+    in property <string> activity-summary: "Nenhuma operação nesta sessão.";
+    in property <string> last-profile: "Essenciais";
+    in-out property <string> query;
+    in-out property <string> filter: "all";
+    in-out property <string> profile-json;
+    in-out property <int> profile-index: -1;
+    in-out property <int> editor-revision: -1;
+    in property <string> downloads-path;
+    in property <string> data-path;
+    in property <string> storage-mode;
+    in-out property <bool> silent-installers;
+    in-out property <bool> source-agreements;
+    in-out property <string> repository: "itsfatduck/optimizerDuck";
+    in property <string> release-info: "Consulte uma release oficial para ver os arquivos disponíveis.";
+    in property <bool> dialog-visible: false;
+    in property <bool> dialog-confirmable: false;
+    in property <string> dialog-title;
+    in property <string> dialog-text;
+    in property <string> dialog-confirm-label: "Confirmar";
+    in property <bool> dialog-needs-terms: false;
+    in-out property <bool> dialog-terms: false;
+    callback navigate(int);
+    callback action(string,string);
+    callback entry-action(string,int);
+    callback toggle(string);
+    callback query-edited(string);
+    callback select-profile(int);
+    callback save-profile(string);
+    callback settings(bool,bool);
+    callback theme(bool);
+    callback dialog-result(bool,bool);
+    in property <bool> custom-editor-open: false;
+    in-out property <int> custom-revision: -1;
+    in-out property <CustomForm> custom-form;
+    in property <[string]> custom-assets;
+    in property <string> custom-release-info;
+    in-out property <int> custom-asset-index: -1;
+    in property <string> custom-count;
+    in property <string> pending-count;
+    in property <bool> pending-editor-open: false;
+    in-out property <int> pending-revision: -1;
+    in-out property <PendingForm> pending-form;
+    callback custom-save(CustomForm);
+    callback custom-query(CustomForm);
+    callback custom-asset-selected(CustomForm,string);
+    callback pending-save(PendingForm);
+
+    HorizontalLayout { spacing: 0;
+        Rectangle { width: 218px; background: Palette.sidebar;
+            Rectangle { x: parent.width - 1px; width: 1px; background: Palette.border; }
+            VerticalLayout { padding: 16px; spacing: 5px;
+                HorizontalLayout { padding-top: 14px; padding-bottom: 24px; spacing: 10px;
+                    Image { width: 40px; height: 40px; source: @image-url("../../assets/icon.png"); image-fit: contain; }
+                    VerticalLayout { spacing: 1px;
+                        Text { text: "Winit"; color: Palette.text; font-size: 18px; font-weight: 700; }
+                        Text { text: "SEU PC. DO SEU JEITO."; color: Palette.muted; font-size: 8px; letter-spacing: 1.3px; }
+                    }
+                }
+                ScrollView { vertical-stretch: 1; VerticalLayout { spacing: 5px;
+                Text { text: "ESPAÇO DE TRABALHO"; color: Palette.muted; font-size: 9px; letter-spacing: 1px; height: 26px; }
+                NavItem { text: "Visão geral"; icon: "\u{e80f}"; selected: root.page == 0; clicked => { root.navigate(0); } }
+                NavItem { text: "Aplicativos"; icon: "\u{e71d}"; selected: root.page == 1; clicked => { root.navigate(1); } }
+                NavItem { text: "Meus aplicativos"; icon: "\u{e710}"; selected: root.page == 8; clicked => { root.navigate(8); } }
+                NavItem { text: "Pendências"; icon: "\u{e73a}"; selected: root.page == 9; clicked => { root.navigate(9); } }
+                NavItem { text: "Instalados"; icon: "\u{e8b7}"; selected: root.page == 2; clicked => { root.navigate(2); } }
+                NavItem { text: "Atualizações"; icon: "\u{e895}"; selected: root.page == 3; clicked => { root.navigate(3); } }
+                NavItem { text: "Utilitários"; icon: "\u{e90f}"; selected: root.page == 4; clicked => { root.navigate(4); } }
+                NavItem { text: "Meus perfis"; icon: "\u{e8a5}"; selected: root.page == 5; clicked => { root.navigate(5); } }
+                Rectangle { height: 18px; background: transparent; }
+                Text { text: "GERENCIAMENTO"; color: Palette.muted; font-size: 9px; letter-spacing: 1px; height: 26px; }
+                NavItem { text: "Operações"; icon: "\u{e9d9}"; selected: root.page == 7; clicked => { root.navigate(7); } }
+                NavItem { text: "Configurações"; icon: "\u{e713}"; selected: root.page == 6; clicked => { root.navigate(6); } }
+                } }
+                Rectangle { height: 82px; border-radius: 10px; background: Palette.panel; border-width: 1px; border-color: Palette.border;
+                    VerticalLayout { padding: 12px; spacing: 7px;
+                        HorizontalLayout { spacing: 7px;
+                            Rectangle { width: 6px; height: 6px; border-radius: 3px; background: root.winget-available ? Palette.accent : #edbd72; }
+                            Text { text: "WINDOWS PACKAGE MANAGER"; color: Palette.muted; font-size: 8px; vertical-alignment: center; }
+                        }
+                        Text { text: root.winget-status; color: Palette.text; font-size: 12px; overflow: elide; }
+                        Text { text: "Winit  /  0.2.0"; color: Palette.muted; font-size: 10px; }
+                    }
+                }
+            }
+        }
+        VerticalLayout { padding: 28px; spacing: 18px; horizontal-stretch: 1;
+            HorizontalLayout { spacing: 12px;
+                VerticalLayout { spacing: 6px;
+                    Text { text: "SEU WINDOWS, ORGANIZADO"; color: Palette.accent; font-size: 9px; letter-spacing: 1.8px; }
+                    Text { text: root.page == 0 ? "Um bom começo para o seu PC." : root.page == 1 ? "Encontre seu próximo aplicativo." : root.page == 2 ? "Seus aplicativos instalados." : root.page == 3 ? "Tudo em dia, sem complicação." : root.page == 4 ? "As ferramentas certas, à mão." : root.page == 5 ? "Seu setup, pronto para repetir." : root.page == 6 ? "Deixe o Winit do seu jeito." : root.page == 8 ? "Seu catálogo vai além do Winget." : root.page == 9 ? "Cada instalação, acompanhada." : "Cada operação, com clareza."; color: Palette.text; font-size: 26px; font-weight: 650; wrap: word-wrap; }
+                    Text { text: root.page == 0 ? "Instale o essencial. Cuide do sistema. Siga em frente." : root.page == 1 ? "Pacotes reais da comunidade Winget. Selecione e instale em lote." : root.page == 2 ? "Aplicativos identificados pelo Winget e pelo registro do Windows." : root.page == 3 ? "Revise as versões antes de atualizar seus aplicativos." : root.page == 4 ? "Ferramentas oficiais do Windows e downloads do GitHub Releases." : root.page == 5 ? "Uma lista de aplicativos que acompanha você em qualquer computador." : root.page == 6 ? "Preferências locais, providers e diagnóstico." : root.page == 8 ? "GitHub Releases, URLs de download e instalação manual, no mesmo Winit." : root.page == 9 ? "Websites, instruções e acompanhamento dos seus perfis." : "Fila serial, downloads verificáveis e histórico persistente."; color: Palette.muted; font-size: 12px; wrap: word-wrap; }
+                }
+                Rectangle { horizontal-stretch: 1; background: transparent; }
+                if root.busy: Spinner { width: 24px; height: 24px; }
+                AButton { text: root.dark ? "☀  Claro" : "☾  Escuro"; clicked => { root.theme(!root.dark); } }
+            }
+
+            if root.page == 0: ScrollView {
+                VerticalLayout { spacing: 18px;
+                    Rectangle { min-height: 172px; border-radius: 14px; background: Palette.accent-bg; border-width: 1px; border-color: Palette.dark ? #35584d : #bcdccf;
+                        HorizontalLayout { padding: 25px; spacing: 20px;
+                            VerticalLayout { spacing: 10px;
+                                Text { text: "MENOS REPETIÇÃO. MAIS POSSIBILIDADES."; color: Palette.accent; font-size: 9px; letter-spacing: 1px; }
+                                Text { text: "Seu ambiente favorito.\nEm poucos cliques."; color: Palette.text; font-size: 27px; font-weight: 650; }
+                                Text { text: "Último perfil: " + root.last-profile; color: Palette.muted; font-size: 12px; }
+                            }
+                            VerticalLayout { alignment: center; spacing: 10px;
+                                AButton { text: "Preparar meu PC  →"; primary: true; clicked => { root.action("last-profile", ""); } }
+                                AButton { text: "Explorar aplicativos"; clicked => { root.navigate(1); } }
+                            }
+                        }
+                    }
+                    HorizontalLayout { spacing: 14px;
+                        StatCard { label: "APLICATIVOS GERENCIADOS"; value: root.installed-count; note: "Detectados pelo Winget"; }
+                        StatCard { label: "ATUALIZAÇÕES DISPONÍVEIS"; value: root.updates-count; note: "Versões conhecidas e elegíveis"; }
+                        StatCard { label: "PERFIS SALVOS"; value: root.profiles-count; note: "Seu ambiente, sempre por perto"; }
+                    }
+                    Rectangle { min-height: 119px; background: Palette.panel; border-width: 1px; border-color: Palette.border; border-radius: 12px;
+                        VerticalLayout { padding: 19px; spacing: 10px;
+                            Text { text: "Este computador"; color: Palette.text; font-size: 15px; font-weight: 600; }
+                            Text { text: root.system-info; color: Palette.muted; font-size: 12px; wrap: word-wrap; }
+                        }
+                    }
+                    HorizontalLayout { spacing: 10px;
+                        AButton { text: "Buscar atualizações"; clicked => { root.navigate(3); } }
+                        AButton { text: "Abrir utilitários"; clicked => { root.navigate(4); } }
+                        AButton { text: "Criar um perfil"; clicked => { root.navigate(5); root.action("profile-new", ""); } }
+                        Rectangle { horizontal-stretch: 1; background: transparent; }
+                    }
+                    Rectangle { min-height: 84px; background: Palette.panel; border-width: 1px; border-color: Palette.border; border-radius: 12px;
+                        VerticalLayout { padding: 18px; spacing: 8px;
+                            Text { text: "Atividade recente"; color: Palette.text; font-weight: 600; }
+                            Text { text: root.activity-summary; color: Palette.muted; font-size: 12px; wrap: word-wrap; }
+                        }
+                    }
+                }
+            }
+
+            if root.page >= 1 && root.page <= 3: VerticalLayout { spacing: 14px;
+                HorizontalLayout { spacing: 10px;
+                    LineEdit { text <=> root.query; placeholder-text: root.page == 1 ? "Pesquisar por nome ou ID do aplicativo…" : "Filtrar por nome ou identificador…"; edited => { root.query-edited(self.text); } horizontal-stretch: 1; }
+                    AButton { text: "Atualizar lista"; clicked => { root.action("refresh", ""); } }
+                    if root.page == 1: AButton { text: "+ Adicionar aplicativo"; clicked => { root.action("custom-new", ""); } }
+                    if root.page == 3: AButton { text: "Atualizar todos"; primary: true; clicked => { root.action("update-all", ""); } }
+                }
+                HorizontalLayout { spacing: 8px;
+                    AButton { text: "Todos"; primary: root.filter == "all"; clicked => { root.action("filter", "all"); } }
+                    AButton { text: "Favoritos"; primary: root.filter == "favorites"; clicked => { root.action("filter", "favorites"); } }
+                    if root.page == 1: AButton { text: "Não instalados"; primary: root.filter == "missing"; clicked => { root.action("filter", "missing"); } }
+                    if root.page == 1: AButton { text: "Instalados"; primary: root.filter == "installed"; clicked => { root.action("filter", "installed"); } }
+                    Rectangle { horizontal-stretch: 1; background: transparent; }
+                    Text { text: root.result-label; color: Palette.muted; font-size: 11px; vertical-alignment: center; }
+                }
+                ScrollView { vertical-stretch: 1;
+                    VerticalLayout { spacing: 8px;
+                        for item in root.entries: ItemCard { item: item; action(i) => { root.entry-action(item.key,i); } toggle => { root.toggle(item.key); } }
+                        if root.entries.length == 0: Rectangle { height: 245px; background: transparent;
+                            VerticalLayout { alignment: center; spacing: 13px;
+                                Text { text: root.busy ? "◌" : "◇"; color: Palette.accent; font-size: 38px; horizontal-alignment: center; }
+                                Text { text: root.empty-title; color: Palette.text; font-size: 19px; font-weight: 600; horizontal-alignment: center; }
+                                Text { text: root.empty-description; color: Palette.muted; font-size: 12px; wrap: word-wrap; horizontal-alignment: center; }
+                            }
+                        }
+                    }
+                }
+                Rectangle { height: 58px; background: Palette.panel; border-radius: 10px; border-width: 1px; border-color: Palette.border;
+                    HorizontalLayout { padding: 11px; spacing: 10px;
+                        Text { text: root.selection-label; color: Palette.muted; vertical-alignment: center; font-size: 12px; horizontal-stretch: 1; }
+                        AButton { text: "Limpar"; clicked => { root.action("clear-selection", ""); } }
+                        AButton { text: "+ Perfil"; clicked => { root.action("selection-profile", ""); } }
+                        if root.page != 2: AButton { text: root.page == 3 ? "Atualizar seleção" : "Instalar seleção"; primary: true; clicked => { root.action(root.page == 3 ? "update-selected" : "install-selected", ""); } }
+                    }
+                }
+            }
+
+            if root.page == 4: VerticalLayout { spacing: 12px;
+                Rectangle { min-height: 151px; background: Palette.panel; border-radius: 12px; border-width: 1px; border-color: Palette.border;
+                    VerticalLayout { padding: 16px; spacing: 10px;
+                        HorizontalLayout { spacing: 10px;
+                            Text { text: "GitHub Releases"; color: Palette.text; font-size: 16px; font-weight: 600; horizontal-stretch: 1; }
+                            AButton { text: "Abrir downloads"; clicked => { root.action("open-downloads", ""); } }
+                        }
+                        HorizontalLayout { spacing: 8px;
+                            LineEdit { text <=> root.repository; placeholder-text: "owner/repository"; horizontal-stretch: 1; }
+                            AButton { text: "Salvar repo"; clicked => { root.action("repository-save",root.repository); } }
+                            AButton { text: "Consultar release"; primary: true; clicked => { root.action("github-query",root.repository); } }
+                        }
+                        Text { text: root.release-info; color: Palette.muted; font-size: 11px; wrap: word-wrap; }
+                    }
+                }
+                HorizontalLayout { spacing: 6px;
+                    for repo in root.repositories: AButton { text: repo; clicked => { root.repository = repo; root.action("github-query",repo); } }
+                    Rectangle { horizontal-stretch: 1; background: transparent; }
+                }
+                ScrollView { vertical-stretch: 1;
+                    VerticalLayout { spacing: 9px;
+                        for item in root.entries: ItemCard { item: item; action(i) => { root.entry-action(item.key,i); } }
+                    }
+                }
+            }
+
+            if root.page == 5: VerticalLayout { spacing: 12px;
+                HorizontalLayout { spacing: 8px;
+                    AButton { text: "+ Novo perfil"; primary: true; clicked => { root.action("profile-new", ""); } }
+                    AButton { text: "Importar JSON"; clicked => { root.action("profile-import", ""); } }
+                    AButton { text: "Exportar JSON"; clicked => { root.action("profile-export",root.profile-json); } }
+                    Rectangle { horizontal-stretch: 1; background: transparent; }
+                }
+                HorizontalLayout { spacing: 14px; vertical-stretch: 1;
+                    Rectangle { width: 200px; background: Palette.panel; border-radius: 10px; border-width: 1px; border-color: Palette.border;
+                        ScrollView { VerticalLayout { padding: 9px; spacing: 6px;
+                            for name[i] in root.profile-names: NavItem { text: name; icon: "\u{e8a5}"; selected: root.profile-index == i; clicked => { root.select-profile(i); } }
+                        } }
+                    }
+                    VerticalLayout { spacing: 10px;
+                        Text { text: "Editor de perfil"; color: Palette.text; font-size: 16px; font-weight: 600; }
+                        Text { text: "Edite o nome, a descrição e os IDs. O JSON é validado ao salvar.\nSelecione pacotes em Aplicativos e use + Perfil para adicioná-los aqui."; color: Palette.muted; font-size: 11px; wrap: word-wrap; }
+                        TextEdit { text <=> root.profile-json; font-family: "Consolas"; font-size: 12px; vertical-stretch: 1; }
+                        HorizontalLayout { spacing: 8px;
+                            AButton { text: "Salvar"; clicked => { root.save-profile(root.profile-json); } }
+                            AButton { text: "Duplicar"; clicked => { root.action("profile-duplicate",root.profile-json); } }
+                            AButton { text: "Excluir"; danger: true; clicked => { root.action("profile-delete", ""); } }
+                            Rectangle { horizontal-stretch: 1; background: transparent; }
+                        }
+                        AButton { text: "Preparar meu PC  →"; primary: true; clicked => { root.action("profile-run",root.profile-json); } }
+                    }
+                }
+            }
+
+            if root.page == 6: ScrollView {
+                VerticalLayout { spacing: 14px;
+                    Rectangle { min-height: 122px; background: Palette.panel; border-width: 1px; border-color: Palette.border; border-radius: 12px;
+                        VerticalLayout { padding: 18px; spacing: 13px;
+                            Text { text: "Aparência e instaladores"; color: Palette.text; font-size: 16px; font-weight: 600; }
+                            HorizontalLayout { spacing: 12px;
+                                AButton { text: root.dark ? "Usar tema claro" : "Usar tema escuro"; clicked => { root.theme(!root.dark); } }
+                                CheckBox { text: "Solicitar instalação silenciosa"; checked <=> root.silent-installers; toggled => { root.settings(root.silent-installers,root.source-agreements); } }
+                            }
+                            Text { text: "O suporte ao modo silencioso e à elevação depende de cada instalador."; color: Palette.muted; font-size: 11px; }
+                        }
+                    }
+                    Rectangle { min-height: 149px; background: Palette.panel; border-width: 1px; border-color: Palette.border; border-radius: 12px;
+                        VerticalLayout { padding: 18px; spacing: 10px;
+                            Text { text: "Windows Package Manager"; color: Palette.text; font-size: 16px; font-weight: 600; }
+                            Text { text: root.winget-status; color: Palette.accent; }
+                            CheckBox { text: "Aceitar termos da origem Winget nas consultas"; checked <=> root.source-agreements; toggled => { root.settings(root.silent-installers,root.source-agreements); } }
+                            HorizontalLayout { spacing: 8px;
+                                AButton { text: "Executar diagnóstico"; clicked => { root.action("diagnose", ""); } }
+                                AButton { text: "Como recuperar o Winget"; clicked => { root.action("recovery", ""); } }
+                                Rectangle { horizontal-stretch: 1; background: transparent; }
+                            }
+                        }
+                    }
+                    Rectangle { min-height: 180px; background: Palette.panel; border-width: 1px; border-color: Palette.border; border-radius: 12px;
+                        VerticalLayout { padding: 18px; spacing: 10px;
+                            Text { text: "Arquivos e dados locais"; color: Palette.text; font-size: 16px; font-weight: 600; }
+                            Text { text: "Downloads: " + root.downloads-path; color: Palette.muted; font-size: 11px; wrap: word-wrap; }
+                            HorizontalLayout { spacing: 8px;
+                                AButton { text: "Alterar diretório"; clicked => { root.action("download-directory", ""); } }
+                                AButton { text: "Abrir downloads"; clicked => { root.action("open-downloads", ""); } }
+                                Rectangle { horizontal-stretch: 1; background: transparent; }
+                            }
+                            Text { text: root.storage-mode + " · " + root.data-path; color: Palette.muted; font-size: 11px; wrap: word-wrap; }
+                            AButton { text: "Abrir dados e histórico de logs"; clicked => { root.action("open-data", ""); } }
+                        }
+                    }
+                    Text { text: "Winit 0.2.0\nRust + Slint · Windows x64 · Dados locais em JSON\nNenhuma alteração administrativa é executada na inicialização."; color: Palette.muted; font-size: 12px; wrap: word-wrap; }
+                }
+            }
+
+            if root.page == 7: VerticalLayout { spacing: 12px;
+                Text { text: root.activity-summary; color: Palette.muted; font-size: 12px; wrap: word-wrap; }
+                HorizontalLayout { spacing: 8px;
+                    AButton { text: "Ver pendências de instalação (" + root.pending-count + ")"; clicked => { root.navigate(9); } }
+                    Rectangle { horizontal-stretch: 1; background: transparent; }
+                }
+                ScrollView { vertical-stretch: 1;
+                    VerticalLayout { spacing: 9px;
+                        for item in root.entries: ItemCard { item: item; action(i) => { root.entry-action(item.key,i); } }
+                        if root.entries.length == 0: Text { text: root.pending-count == "0" ? "O histórico começa com a sua primeira operação.\nInstalações, atualizações e downloads aparecerão aqui." : "Nenhuma operação automática neste histórico.\nAcompanhe as instalações manuais em Pendências."; color: Palette.muted; wrap: word-wrap; }
+                    }
+                }
+            }
+
+            if root.page == 8: VerticalLayout { spacing: 12px;
+                HorizontalLayout { spacing: 8px;
+                    AButton { text: "+ Adicionar aplicativo"; primary: true; clicked => { root.action("custom-new", ""); } }
+                    AButton { text: "Importar"; clicked => { root.action("custom-import", ""); } }
+                    AButton { text: "Exportar"; clicked => { root.action("custom-export", ""); } }
+                    AButton { text: "Exemplo: DuoDesk"; clicked => { root.action("custom-example", ""); } }
+                    Rectangle { horizontal-stretch: 1; background: transparent; }
+                }
+                HorizontalLayout { spacing: 8px;
+                    LineEdit { text <=> root.query; placeholder-text: "Buscar no meu catálogo por nome, categoria ou origem…"; edited => { root.query-edited(self.text); } horizontal-stretch: 1; }
+                    AButton { text: "Favoritos"; primary: root.filter == "favorites"; clicked => { root.action("filter", root.filter == "favorites" ? "all" : "favorites"); } }
+                }
+                Text { text: root.custom-count + " cadastros · Baixar não significa instalar. A origem é informada pelo usuário."; color: Palette.muted; font-size: 11px; wrap: word-wrap; }
+                ScrollView { vertical-stretch: 1; VerticalLayout { spacing: 8px;
+                    for item in root.entries: ItemCard { item: item; action(i) => { root.entry-action(item.key,i); } toggle => { root.toggle(item.key); } }
+                    if root.entries.length == 0: Text { text: "Seu catálogo, do seu jeito.\nAdicione um aplicativo por GitHub, URL HTTPS ou instalação manual.\nUse Exemplo: DuoDesk para adicionar a sugestão sem substituir seus cadastros."; color: Palette.muted; wrap: word-wrap; }
+                } }
+                HorizontalLayout { spacing: 8px;
+                    Text { text: root.selection-label; color: Palette.muted; horizontal-stretch: 1; vertical-alignment: center; }
+                    AButton { text: "Excluir seleção"; danger: true; clicked => { root.action("custom-delete", ""); } }
+                    AButton { text: "+ Perfil"; clicked => { root.action("selection-profile", ""); } }
+                    AButton { text: "Obter seleção"; primary: true; clicked => { root.action("custom-obtain-selected", ""); } }
+                }
+            }
+
+            if root.page == 9: VerticalLayout { spacing: 12px;
+                HorizontalLayout { spacing: 8px;
+                    AButton { text: "+ Nova pendência"; primary: true; clicked => { root.action("pending-new", ""); } }
+                    AButton { text: "Todas"; primary: root.filter == "all"; clicked => { root.action("filter", "all"); } }
+                    AButton { text: "Pendentes"; primary: root.filter == "pending"; clicked => { root.action("filter", "pending"); } }
+                    AButton { text: "Concluídas"; primary: root.filter == "completed"; clicked => { root.action("filter", "completed"); } }
+                    Rectangle { horizontal-stretch: 1; background: transparent; }
+                }
+                LineEdit { text <=> root.query; placeholder-text: "Buscar pendência, perfil ou website…"; edited => { root.query-edited(self.text); } }
+                Text { text: "Conclusão manual é um registro de acompanhamento; não comprova instalação no Windows."; color: Palette.muted; font-size: 11px; wrap: word-wrap; }
+                ScrollView { vertical-stretch: 1; VerticalLayout { spacing: 8px;
+                    for item in root.entries: ItemCard { item: item; action(i) => { root.entry-action(item.key,i); } toggle => { root.toggle(item.key); } }
+                    if root.entries.length == 0: Text { text: "Nenhuma pendência nesta lista.\nAs instalações manuais dos perfis e dos seus aplicativos aparecerão aqui."; color: Palette.muted; wrap: word-wrap; }
+                } }
+                HorizontalLayout { spacing: 8px;
+                    Text { text: root.selection-label; color: Palette.muted; horizontal-stretch: 1; vertical-alignment: center; }
+                    AButton { text: "Remover"; danger: true; clicked => { root.action("pending-delete", ""); } }
+                    AButton { text: "Abrir pasta"; clicked => { root.action("pending-open-folder", ""); } }
+                    AButton { text: "Abrir instalador"; clicked => { root.action("pending-open-file", ""); } }
+                }
+            }
+
+            Rectangle { height: 46px; border-radius: 8px; background: root.error ? (root.dark ? #38252c : #fbe9ed) : Palette.panel;
+                HorizontalLayout { padding-left: 12px; padding-right: 10px; spacing: 9px;
+                    Text { text: root.error ? "!" : "•"; color: root.error ? Palette.danger : Palette.accent; font-weight: 700; vertical-alignment: center; }
+                    Text { text: root.status; color: root.error ? Palette.danger : Palette.muted; font-size: 11px; overflow: elide; vertical-alignment: center; horizontal-stretch: 1; }
+                    AButton { text: "Detalhes"; clicked => { root.action("status-details", ""); } }
+                }
+            }
+        }
+    }
+
+    if root.custom-editor-open: Rectangle { background: #00000099;
+        TouchArea {}
+        Rectangle { width: min(parent.width - 70px, 760px); height: parent.height - 50px; x: (parent.width - self.width) / 2; y: 25px; background: Palette.panel; border-radius: 14px; border-width: 1px; border-color: Palette.border;
+            VerticalLayout { padding: 24px; spacing: 12px;
+                Text { text: root.custom-form.id == "" ? "Adicionar aplicativo" : "Editar aplicativo"; color: Palette.text; font-size: 22px; font-weight: 650; }
+                ScrollView { vertical-stretch: 1; VerticalLayout { spacing: 9px;
+                    Text { text: "Nome do aplicativo"; color: Palette.muted; }
+                    LineEdit { text <=> root.custom-form.name; placeholder-text: "Nome do software"; }
+                    HorizontalLayout { spacing: 10px;
+                        VerticalLayout { spacing: 6px; Text { text: "Descrição (opcional)"; color: Palette.muted; } LineEdit { text <=> root.custom-form.description; } }
+                        VerticalLayout { spacing: 6px; Text { text: "Categoria (opcional)"; color: Palette.muted; } LineEdit { text <=> root.custom-form.category; } }
+                    }
+                    Text { text: "Website oficial (HTTPS)"; color: Palette.muted; }
+                    LineEdit { text <=> root.custom-form.website; placeholder-text: "https://…"; }
+                    Text { text: "Origem da instalação"; color: Palette.muted; }
+                    ComboBox { model: ["GitHub Releases", "URL direta", "Manual"]; current-index <=> root.custom-form.source; }
+                    if root.custom-form.source == 0: VerticalLayout { spacing: 9px;
+                        Text { text: "Repositório GitHub"; color: Palette.muted; }
+                        LineEdit { text <=> root.custom-form.repository; placeholder-text: "owner/repository"; }
+                        HorizontalLayout { spacing: 12px;
+                            CheckBox { text: "Incluir pré-releases"; checked <=> root.custom-form.prerelease; }
+                            ComboBox { model: ["Windows x64", "Windows ARM64", "Windows x86"]; current-index <=> root.custom-form.architecture; }
+                        }
+                        Text { text: "Padrão do asset (opcional; aceita * e ?)"; color: Palette.muted; }
+                        LineEdit { text <=> root.custom-form.pattern; placeholder-text: "Ex.: MeuApp-Setup-*.exe"; }
+                        AButton { text: "Consultar releases e arquivos"; clicked => { root.custom-query(root.custom-form); } }
+                        Text { text: root.custom-release-info; color: Palette.muted; font-size: 11px; wrap: word-wrap; }
+                        if root.custom-assets.length > 0: ComboBox { model: root.custom-assets; current-index <=> root.custom-asset-index; selected(value) => { root.custom-asset-selected(root.custom-form,value); } }
+                    }
+                    if root.custom-form.source == 1: VerticalLayout { spacing: 9px;
+                        Text { text: "URL HTTPS do instalador"; color: Palette.muted; }
+                        LineEdit { text <=> root.custom-form.url; placeholder-text: "https://fornecedor.example/instalador.exe"; }
+                        Text { text: "Nome do arquivo (sem diretório)"; color: Palette.muted; }
+                        LineEdit { text <=> root.custom-form.filename; placeholder-text: "instalador.exe"; }
+                        Text { text: "SHA-256 (opcional; 64 dígitos hexadecimais)"; color: Palette.muted; }
+                        LineEdit { text <=> root.custom-form.sha256; }
+                        Text { text: "Atualização não verificável: uma URL fixa não informa se existe uma versão mais recente."; color: Palette.muted; font-size: 11px; wrap: word-wrap; }
+                    }
+                    if root.custom-form.source == 2: Text { text: "O aplicativo será registrado como pendência manual, com acesso ao website e acompanhamento da conclusão."; color: Palette.muted; wrap: word-wrap; }
+                    Text { text: "Instruções de instalação (opcional)"; color: Palette.muted; }
+                    TextEdit { text <=> root.custom-form.instructions; height: 90px; }
+                    Text { text: "Origem informada pelo usuário. Integridade por hash não comprova a identidade do fornecedor. Nenhum instalador é executado automaticamente."; color: Palette.muted; font-size: 11px; wrap: word-wrap; }
+                } }
+                HorizontalLayout { spacing: 10px;
+                    AButton { text: "Abrir website"; clicked => { root.action("custom-open-website",root.custom-form.website); } }
+                    Rectangle { horizontal-stretch: 1; background: transparent; }
+                    AButton { text: "Cancelar"; clicked => { root.action("custom-close", ""); } }
+                    AButton { text: "Salvar aplicativo"; primary: true; clicked => { root.custom-save(root.custom-form); } }
+                }
+            }
+        }
+    }
+
+    if root.pending-editor-open: Rectangle { background: #00000099;
+        TouchArea {}
+        Rectangle { width: min(parent.width - 90px, 650px); height: min(parent.height - 70px, 610px); x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; background: Palette.panel; border-radius: 14px; border-width: 1px; border-color: Palette.border;
+            VerticalLayout { padding: 24px; spacing: 10px;
+                Text { text: root.pending-form.id == "" ? "Nova pendência manual" : "Editar pendência"; color: Palette.text; font-size: 22px; font-weight: 650; }
+                Text { text: "Nome do aplicativo"; color: Palette.muted; }
+                LineEdit { text <=> root.pending-form.name; }
+                Text { text: "Website oficial (HTTPS)"; color: Palette.muted; }
+                LineEdit { text <=> root.pending-form.website; }
+                Text { text: "Perfil associado (nome; deixe vazio para nenhum)"; color: Palette.muted; }
+                LineEdit { text <=> root.pending-form.profile; }
+                Text { text: "Instruções"; color: Palette.muted; }
+                TextEdit { text <=> root.pending-form.instructions; vertical-stretch: 1; }
+                Text { text: "Marcar como concluído não comprova instalação no Windows."; color: Palette.muted; font-size: 11px; wrap: word-wrap; }
+                HorizontalLayout { spacing: 10px;
+                    Rectangle { horizontal-stretch: 1; background: transparent; }
+                    AButton { text: "Cancelar"; clicked => { root.action("pending-close", ""); } }
+                    AButton { text: "Salvar pendência"; primary: true; clicked => { root.pending-save(root.pending-form); } }
+                }
+            }
+        }
+    }
+
+    if root.dialog-visible: Rectangle { background: #00000099;
+        TouchArea {}
+        Rectangle { width: min(parent.width - 120px, 680px); height: min(parent.height - 100px, 580px); x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; background: Palette.panel; border-radius: 14px; border-width: 1px; border-color: Palette.border;
+            VerticalLayout { padding: 25px; spacing: 15px;
+                Text { text: root.dialog-title; color: Palette.text; font-size: 22px; font-weight: 650; wrap: word-wrap; }
+                TextEdit { text: root.dialog-text; read-only: true; font-size: 12px; vertical-stretch: 1; }
+                if root.dialog-needs-terms: CheckBox { text: "Aceito os termos dos pacotes e da origem para esta operação"; checked <=> root.dialog-terms; }
+                HorizontalLayout { spacing: 10px;
+                    Rectangle { horizontal-stretch: 1; background: transparent; }
+                    AButton { text: root.dialog-confirmable ? "Cancelar" : "Fechar"; clicked => { root.dialog-result(false,false); } }
+                    if root.dialog-confirmable: AButton { text: root.dialog-confirm-label; primary: true; enabled: !root.dialog-needs-terms || root.dialog-terms; clicked => { root.dialog-result(true,root.dialog-terms); } }
+                }
+            }
+        }
+    }
+}

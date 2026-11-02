@@ -1,0 +1,38 @@
+[package]
+name = "winit"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.92"
+description = "Central portátil de aplicativos e utilitários para Windows"
+build = "build.rs"
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+futures-util = "0.3"
+hex = "0.4"
+image = { version = "0.25", default-features = false, features = ["png"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "stream"] }
+rfd = "0.16"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+slint = { version = "=1.15.1", default-features = false, features = ["std", "backend-winit", "renderer-software", "compat-1-2", "accessibility"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "process", "io-util", "time", "fs", "macros"] }
+unicode-width = "0.2"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Memory", "Win32_System_SystemInformation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Storage_FileSystem"] }
+
+[build-dependencies]
+slint-build = "=1.15.1"
+winresource = "0.1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"
+
