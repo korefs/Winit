@@ -8,6 +8,8 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.package.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -23,8 +25,14 @@ jobs:
       - name: Build portable Windows x64
         run: cargo build --locked --release --target x86_64-pc-windows-msvc
       - name: Package
+        id: package
         shell: pwsh
         run: |
+          $metadata = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw "Could not read Cargo metadata" }
+          $version = ($metadata.packages | Where-Object { $_.name -eq 'winit' }).version
+          if (-not $version) { throw "Winit package version is missing" }
+          "version=$version" >> $env:GITHUB_OUTPUT
           New-Item -ItemType Directory -Path dist -Force
           New-Item -ItemType Directory -Path dist/assets -Force
           New-Item -ItemType Directory -Path dist/docs -Force
@@ -36,9 +44,51 @@ jobs:
           Copy-Item docs/CUSTOM_APPS.md dist/docs/CUSTOM_APPS.md
           Copy-Item docs/CUSTOM_APPS_VALIDATION.md dist/docs/CUSTOM_APPS_VALIDATION.md
           Copy-Item assets/icon.png dist/assets/icon.png
-          Get-FileHash dist/Winit.exe -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  Winit.exe" } | Set-Content dist/SHA256SUMS.txt
+          $hash = (Get-FileHash dist/Winit.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          [System.IO.File]::WriteAllText((Join-Path $PWD 'dist/SHA256SUMS.txt'), "$hash  Winit.exe`n", [System.Text.UTF8Encoding]::new($false))
       - uses: actions/upload-artifact@v4
         with:
           name: Winit-Windows-x64
           path: dist/
           if-no-files-found: error
+          overwrite: true
+
+  release:
+    name: Publish portable release
+    needs: windows
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Winit-Windows-x64
+          path: dist
+      - name: Publish Winit.exe
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          APP_VERSION: ${{ needs.windows.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum --check SHA256SUMS.txt
+          tag="v${APP_VERSION}-build.${GITHUB_RUN_NUMBER}"
+
+          if is_draft=$(gh release view "$tag" --json isDraft --jq '.isDraft' 2>/dev/null); then
+            if [ "$is_draft" = "false" ]; then
+              echo "Release $tag is already published."
+              exit 0
+            fi
+            gh release upload "$tag" Winit.exe SHA256SUMS.txt --clobber
+          else
+            gh release create "$tag" Winit.exe SHA256SUMS.txt \
+              --target "$GITHUB_SHA" \
+              --title "Winit ${APP_VERSION} (build ${GITHUB_RUN_NUMBER})" \
+              --generate-notes \
+              --draft
+          fi
+
+          gh release edit "$tag" --draft=false --latest

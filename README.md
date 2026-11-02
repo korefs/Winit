@@ -147,8 +147,6 @@ The interface self-test opens the Slint window, queries real providers, and exer
 cargo run --locked -- --self-test
 ```
 
-The [Windows x64 workflow](.github/workflows/windows.yml) checks formatting, Clippy, and tests, builds the release, and uploads an artifact containing the executable, documentation, examples, and SHA-256 checksum. Publishing a GitHub Release is a separate step. The [recorded 0.2.0 validation](docs/CUSTOM_APPS_VALIDATION.md) describes local checks performed before the Winit rename and their limitations.
-
 ### Project structure
 
 ```text
