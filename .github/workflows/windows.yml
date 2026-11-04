@@ -41,8 +41,6 @@ jobs:
           Copy-Item assets/essentials.json dist/essentials.json
           Copy-Item assets/duodesk-catalog.json dist/duodesk-catalog.json
           Copy-Item assets/duodesk-catalog.json dist/assets/duodesk-catalog.json
-          Copy-Item docs/CUSTOM_APPS.md dist/docs/CUSTOM_APPS.md
-          Copy-Item docs/CUSTOM_APPS_VALIDATION.md dist/docs/CUSTOM_APPS_VALIDATION.md
           Copy-Item assets/icon.png dist/assets/icon.png
           $hash = (Get-FileHash dist/Winit.exe -Algorithm SHA256).Hash.ToLowerInvariant()
           [System.IO.File]::WriteAllText((Join-Path $PWD 'dist/SHA256SUMS.txt'), "$hash  Winit.exe`n", [System.Text.UTF8Encoding]::new($false))
